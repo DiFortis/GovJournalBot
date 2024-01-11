@@ -21,13 +21,17 @@ npm install axios discord.js dotenv mongoose
 ```js
 node index.js
 ```
+## Environment Variables
+
+To run this project, you will need to add the following environment variables to your .env file
+
+`DISCORD_TOKEN` - Which is discord's bot token.
+
+`DATABASE_URL` - Which is MongoDB connection link.
 
 ## Tech Stack
 
-**BOT:** JavaScript, Node JS 
-
-
-
+**BOT:** JavaScript, Node JS
 
 ## Authors
 
