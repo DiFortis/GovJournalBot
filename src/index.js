@@ -13,6 +13,7 @@ const SEJM_API_URL = "https://api.sejm.gov.pl/eli/acts/DU";
 client.once("ready", () => {
   console.log(`Zalogowano jako ${client.user.tag}`);
   initializeStatusMessage();
+  checkForNewLaws();
   setInterval(checkForNewLaws, 3600000);
 });
 
@@ -33,11 +34,12 @@ async function initializeStatusMessage() {
 }
 
 async function checkForNewLaws() {
+  console.log("Sprawdzanie nowych ustaw...");
   try {
     const currentYear = new Date().getFullYear();
+    console.log(`Wysyłanie zapytania do API dla roku: ${currentYear}`);
     const response = await axios.get(`${SEJM_API_URL}/${currentYear}`);
     const laws = response.data.items;
-    console.log(JSON.stringify(response.data.items));
 
     for (const law of laws) {
       const existingLaw = await ActsModel.findOne({ ELI: law.ELI });
@@ -78,7 +80,26 @@ async function checkForNewLaws() {
       }
     }
   } catch (error) {
-    console.error("Błąd podczas pobierania nowych ustaw:", error);
+    console.error("Błąd podczas pobierania nowych ustaw: serwer niedostępny.",);
+    if (error.response && error.response.status === 503) {
+      await updateStatusMessages("Serwer API tymczasowo niedostępny.");
+    }
+  }
+}
+
+async function updateStatusMessages(statusText) {
+  const embed = new EmbedBuilder()
+    .setColor("#0099ff")
+    .setTitle("Status Ustaw")
+    .setDescription(statusText);
+
+  for (const [channelId] of statusMessages) {
+    const message = statusMessages.get(channelId);
+    if (message) {
+      message.edit({ embeds: [embed] });
+    } else {
+      console.log(`Nie znaleziono wiadomości dla kanału: ${channelId}`);
+    }
   }
 }
 
