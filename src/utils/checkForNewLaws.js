@@ -4,8 +4,9 @@ const ActsModel = require("../models/Acts");
 const StatsModel = require("../models/Stats");
 const updateStatusMessages = require("./updateStatusMessages");
 
-async function checkForNewLaws(client, statusMessages, SEJM_API_URL) {
-  console.log("Sprawdzanie nowych ustaw...");
+const SEJM_API_URL = "https://api.sejm.gov.pl/eli/acts/DU";
+
+async function checkForNewLaws(client, statusMessages) {
   try {
     const currentYear = new Date().getFullYear();
     const response = await axios.get(`${SEJM_API_URL}/${currentYear}`);
@@ -17,6 +18,10 @@ async function checkForNewLaws(client, statusMessages, SEJM_API_URL) {
         const newLaw = new ActsModel({ ...law });
         await newLaw.save();
 
+        const detailedLawURL = `${SEJM_API_URL}/${law.year}/${law.pos}`;
+        const detailedResponse = await axios.get(detailedLawURL);
+        const detailedLaw = detailedResponse.data;
+
         const currentMonth = new Date().getMonth();
         const stats =
           (await StatsModel.findOne({ month: currentMonth })) ||
@@ -26,12 +31,16 @@ async function checkForNewLaws(client, statusMessages, SEJM_API_URL) {
 
         const embed = new EmbedBuilder()
           .setTitle("Nowa Ustawa")
-          .setDescription(`${law.title} (${law.type})`)
+          .setDescription(`${detailedLaw.title} (${detailedLaw.type})`)
           .addFields(
-            { name: "Data ogłoszenia", value: law.announcementDate, inline: true },
-            { name: "Data promulgacji", value: law.promulgation, inline: true },
-            { name: "Status", value: law.status },
-            { name: "Link", value: `https://api.sejm.gov.pl/eli/acts/DU/${law.year}/${law.ELI}`, inline: false }
+            { name: "Data ogłoszenia", value: detailedLaw.announcementDate, inline: true },
+            { name: "Data promulgacji", value: detailedLaw.promulgation, inline: true },
+            { name: "Status", value: detailedLaw.status },
+            { name: "Typ aktu prawnego", value: detailedLaw.type, inline: true },
+            { name: "Tekst jednolity", value: detailedLaw.references?.['Tekst jednolity dla aktu']?.[0]?.id ? `https://dziennikustaw.gov.pl/${detailedLaw.references['Tekst jednolity dla aktu'][0].id}` : 'Brak dostępnego tekstu jednolitego', inline: false },
+            { name: "Słowa kluczowe", value: detailedLaw.keywords?.length > 0 ? detailedLaw.keywords.join(', ') : 'Brak słów kluczowych' },
+            { name: "Wydany przez", value: detailedLaw.releasedBy?.length > 0 ? detailedLaw.releasedBy.join(', ') : 'Brak informacji o wydawcy' },
+            { name: "Link", value: `https://dziennikustaw.gov.pl/${detailedLaw.ELI}`, inline: false }
           )
           .setColor("#0099ff");
 
@@ -39,11 +48,12 @@ async function checkForNewLaws(client, statusMessages, SEJM_API_URL) {
           const discordChannel = await client.channels.fetch(channelId);
           await discordChannel.send({ embeds: [embed] });
         }
-      }
+      } 
     }
   } catch (error) {
-    console.error("Błąd podczas pobierania nowych ustaw: Serwer API tymczasowo niedostępny.");
+    console.error("Błąd podczas pobierania nowych ustaw:", error.message);
     if (error.response && error.response.status === 503) {
+      console.log("Błąd 503: Serwer API tymczasowo niedostępny.");
       await updateStatusMessages(statusMessages, "Serwer API tymczasowo niedostępny.");
     }
   }
