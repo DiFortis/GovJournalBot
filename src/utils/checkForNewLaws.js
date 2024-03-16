@@ -22,10 +22,10 @@ async function checkForNewLaws(client, statusMessages) {
         const detailedResponse = await axios.get(detailedLawURL);
         const detailedLaw = detailedResponse.data;
 
-        const currentMonth = new Date().getMonth();
+        const currentMonth = new Date().getMonth() + 1;
         const stats =
           (await StatsModel.findOne({ month: currentMonth })) ||
-          new StatsModel({ month: currentMonth, lawsCount: 0 });
+          new StatsModel({ month: currentMonth, year: currentYear, lawsCount: 0 });
         stats.lawsCount += 1;
         await stats.save();
 
